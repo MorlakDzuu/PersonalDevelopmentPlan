@@ -1,0 +1,118 @@
+# Разобраться с принцыпами кэширования
+
+__Кэширование__ - временное хранение данных в оперативной памяти для оптимизации производительности приложения.
+Данные стоит кэшировать, если они изменяются нечасто.
+
+* __Типы кэширования__
+    + Кэширование в памяти *(Microsoft.Extensions.Caching.Memory)*
+    + Распределенное кэширование *(Microsoft.Extensions.Caching.Distributed)*
+
+ ## __Кэширование в памяти__ ##
+
+Этот тип кэширования подходит для приложений, работающий на одном сервере, так как у них одно адресное пространство, принадлежащее процессу приложения
+
+ __IMemoryCache__ - представляет локальный кэш в памяти, его значения не сериализуется. Его текущая реализация - оболочка ConcurrentDictionary<TKey,TValue>
+
+ __ICacheEntry__ - представляет запись в реализации кэша IMemoryCache, может быть любым __object__
+
+Потребитель кэша может задать или изменить время жизни записи в кэшэ, так как имеет доступ к следующим
+* свойствам:
+    + __ICacheEntry.AbsoluteExpiration__ - абсолютная дата окончания срока готдности (принимает DateTimeOffset)
+    + __ICacheEntry.AbsoluteExpirationRelativeToNow__ - абсолютная дата окончания срока годонсти относительно текущего момента (принимает TimeSpan?)
+    + __ICacheEntry.SlidingExpiration__ - допустимое время неактивности записи
+ 
+ __!!Если запись протухнет, то она вытесняется__
+
+ * Потребитель может настроить поведение записей с помощью __MemoryCacheEntryOptions__, например:
+    + __MemoryCacheEntryOptions__ позволяет задать срок действия и обратный вызов при изменении записи 
+        - *MemoryCacheEntryExtensions.AddExpirationToken* - срок действия записи = срок действия токена 
+        - *MemoryCacheEntryExtensions.RegisterPostEvictionCallback* - задает обратный вызов
+    + __CacheItemPriority__ позволяет настроить приоритеты записей (какую запись можно удалить в случае нехватки памяти)
+        - *MemoryCacheEntryExtensions.SetPriority* задает приоритет записи
+    + __ICacheEntry.Size__ позволяет задать или изменить размер записи в кэшэ
+        - *MemoryCacheEntryExtensions.SetSize* задает размер записи
+
+### __Реализация__ ###
+
+1. Прописать __AddMemoryCache()__ в конфигурации скрвисво
+```csharp
+using IHost host = Host.CreateDefaultBuilder(args)
+    .ConfigureServices(services => services.AddMemoryCache())
+    .Build();
+```
+
+:::code language="csharp" source="CacheUsageDemo/CacheUsageDemo/Program.cs" range="10,13,21-22":::
+
+2. Получить инстанс __IMemoryCache__, например
+```csharp
+IMemoryCache cache = host.Services.GetRequiredService<IMemoryCache>();
+```
+3. Реализовать запись в кэш, например закинем в кэш буковки
+```csharp
+
+// Выполняем итерацию для кажой буквы алфавита
+static async ValueTask IterateAlphabetAsync(
+    Func<char, Task> asyncFunc)
+{
+    for (char letter = 'A'; letter <= 'Z'; ++ letter)
+    {
+        // Инициализируем итерацию для конкретной буквы алфавита и ждем её завершения
+        await asyncFunc(letter);
+    }
+
+    Console.WriteLine();
+}
+
+// Поведение обратного вызова
+static void OnPostEviction(
+    object key, object? letter, EvictionReason reason, object? state)
+{
+    if (letter is AlphabetLetter alphabetLetter)
+    {
+        // Фиксируем вытеснение конкретной записи
+        Console.WriteLine($"{alphabetLetter.Letter} was evicted for {reason}.");
+    }
+};
+
+// Поведение при добавлении записи в кэш
+var addLettersToCacheTask = IterateAlphabetAsync(letter =>
+{
+    MemoryCacheEntryOptions options = new()
+    {
+        // Задаем время время жизни записи
+        AbsoluteExpirationRelativeToNow =
+            TimeSpan.FromMilliseconds(MillisecondsAbsoluteExpiration)
+    };
+
+    // Задаем обратный вызов
+    _ = options.RegisterPostEvictionCallback(OnPostEviction);
+
+    // Вызываем метод Set, принадлежащий API экземпляра IMemoryCache
+    AlphabetLetter alphabetLetter =
+        cache.Set(
+            letter, new AlphabetLetter(letter), options);
+
+    // Фиксируем действие добавления записи в кэш
+    Console.WriteLine($"{alphabetLetter.Letter} was cached.");
+
+    // Создаем задачу и откладываем ее выполнение на определенное время
+    return Task.Delay(
+        TimeSpan.FromMilliseconds(MillisecondsDelayAfterAdd));
+});
+await addLettersToCacheTask;
+
+// Подписываемся на срабатывание обратного вызова
+var readLettersFromCacheTask = IterateAlphabetAsync(letter =>
+{
+    // Проверяем сработал ли обратный вызов
+    if (cache.TryGetValue(letter, out object? value) &&
+        value is AlphabetLetter alphabetLetter)
+    {
+        // Обратный вызов еще не сработал, значит запись еще в кэше
+        Console.WriteLine($"{letter} is still in cache. {alphabetLetter.Message}");
+    }
+
+    return Task.CompletedTask;
+});
+await readLettersFromCacheTask;
+```
