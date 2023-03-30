@@ -34,45 +34,20 @@ __Кэширование__ - временное хранение данных в
 
 ### __Реализация__ ###
 
-1. Прописать __AddMemoryCache()__ в конфигурации скрвисво
+1. Прописать __AddMemoryCache()__ в конфигурации сервисов
 ```csharp
 using IHost host = Host.CreateDefaultBuilder(args)
     .ConfigureServices(services => services.AddMemoryCache())
     .Build();
 ```
 
-:::code language="csharp" source="CacheUsageDemo/CacheUsageDemo/Program.cs" range="10,13,21-22":::
-
 2. Получить инстанс __IMemoryCache__, например
 ```csharp
 IMemoryCache cache = host.Services.GetRequiredService<IMemoryCache>();
 ```
+
 3. Реализовать запись в кэш, например закинем в кэш буковки
 ```csharp
-
-// Выполняем итерацию для кажой буквы алфавита
-static async ValueTask IterateAlphabetAsync(
-    Func<char, Task> asyncFunc)
-{
-    for (char letter = 'A'; letter <= 'Z'; ++ letter)
-    {
-        // Инициализируем итерацию для конкретной буквы алфавита и ждем её завершения
-        await asyncFunc(letter);
-    }
-
-    Console.WriteLine();
-}
-
-// Поведение обратного вызова
-static void OnPostEviction(
-    object key, object? letter, EvictionReason reason, object? state)
-{
-    if (letter is AlphabetLetter alphabetLetter)
-    {
-        // Фиксируем вытеснение конкретной записи
-        Console.WriteLine($"{alphabetLetter.Letter} was evicted for {reason}.");
-    }
-};
 
 // Поведение при добавлении записи в кэш
 var addLettersToCacheTask = IterateAlphabetAsync(letter =>
@@ -116,3 +91,4 @@ var readLettersFromCacheTask = IterateAlphabetAsync(letter =>
 });
 await readLettersFromCacheTask;
 ```
+
