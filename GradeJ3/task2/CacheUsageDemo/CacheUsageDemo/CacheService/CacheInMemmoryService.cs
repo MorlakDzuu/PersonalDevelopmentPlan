@@ -16,8 +16,7 @@ namespace CacheUsageDemo.CacheService
             MemoryCacheEntryOptions options = new()
             {
                 // Задаем время время жизни записи
-                AbsoluteExpirationRelativeToNow =
-            TimeSpan.FromMilliseconds( MillisecondsAbsoluteExpiration )
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMilliseconds( MillisecondsAbsoluteExpiration )
             };
 
             // Задаем обратный вызов
@@ -37,7 +36,7 @@ namespace CacheUsageDemo.CacheService
         {
             if ( _cache.TryGetValue( record, out object? value ) && value is T tObj )
             {
-                Console.WriteLine( $"{record} is still in cache. {tObj}" );
+                Console.WriteLine( $"{record} is still in cache." );
             }
 
             return Task.CompletedTask;

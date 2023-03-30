@@ -92,3 +92,48 @@ var readLettersFromCacheTask = IterateAlphabetAsync(letter =>
 await readLettersFromCacheTask;
 ```
 
+ ## __Распределенное кэширование__ ##
+
+ API распределенного кэширования немного проще, чем их аналоги API кэширования в памяти. Пары "ключ — значение" тоже проще. Ключи кэширования в памяти основаны на object, а ключи распределенного кэширования являются типом string. При использовании кэширования в памяти значением может быть любой строго типизированный универсальный тип, тогда как значения в распределенном кэшировании сохраняются в виде byte[]. Это не означает, что различные реализации не предоставляют строго типизированные универсальные значения, но это будет особенностью реализации.
+
+ ### __Реализация__ ###
+1. Вместо __AddMemoryCache()__ прописать в конфигурации сервисов __AddDistributedMemoryCache()__
+```csharp
+using IHost host = Host.CreateDefaultBuilder(args)
+    .ConfigureServices(services => services.AddDistributedMemoryCache())
+    .Build();
+```
+
+2. Создание значений
+```csharp
+DistributedCacheEntryOptions options = new()
+{
+    // Задаем время жизни записи
+    AbsoluteExpirationRelativeToNow =
+        TimeSpan.FromMilliseconds(MillisecondsAbsoluteExpiration)
+};
+
+// Сериализуем запись json строку
+AlphabetLetter alphabetLetter = new(letter);
+string json = JsonSerializer.Serialize(alphabetLetter);
+byte[] bytes = Encoding.UTF8.GetBytes(json);
+
+// Добавляем в кэш
+await cache.SetAsync(letter.ToString(), bytes, options);
+```
+
+3. Чтение значений
+```csharp
+AlphabetLetter? alphabetLetter = null;
+
+// Пробуем прочитать из кеша
+byte[]? bytes = await cache.GetAsync(letter.ToString());
+
+// Проверяем прочитали ли
+if (bytes is { Length: > 0 })
+{
+    // Десериализуем
+    string json = Encoding.UTF8.GetString(bytes);
+    alphabetLetter = JsonSerializer.Deserialize<AlphabetLetter>(json);
+}
+```

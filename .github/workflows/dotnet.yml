@@ -21,8 +21,10 @@ jobs:
       with:
         dotnet-version: 6.0.x
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore GradeJ3/task2/CacheUsageDemo
     - name: Build
-      run: dotnet build --no-restore
-    - name: Test
-      run: dotnet test --no-build --verbosity normal
+      run: dotnet build GradeJ3/task2/CacheUsageDemo --no-restore
+    - name: RunDistributed
+      run: dotnet run --project GradeJ3/task2/CacheUsageDemo/CacheUsageDemo
+    - name: RunInMemmory
+      run: cd GradeJ3/task2/CacheUsageDemo/CacheUsageDemo; dotnet run -- in-memmory

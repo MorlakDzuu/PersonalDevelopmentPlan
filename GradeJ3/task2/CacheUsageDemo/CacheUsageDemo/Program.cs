@@ -27,7 +27,7 @@ public class Program
 
     static async ValueTask IterateAssAsync( Func<string, Task> asyncFunc )
     {
-        for ( int i = 1; i < 20; i++ )
+        for ( int i = 1; i < 30; i++ )
         {
             await asyncFunc( $"ЖОПА_{i}" );
         }
